@@ -1,6 +1,6 @@
 package com.dks.bgame.client.android;
 
-import com.sfs.connector.R;
+
 import com.smartfoxserver.v2.entities.data.ISFSObject;
 import com.smartfoxserver.v2.entities.data.SFSObject;
 import com.smartfoxserver.v2.exceptions.SFSException;
@@ -105,8 +105,7 @@ public class GameActivity extends Activity implements IEventListener {
 				public void run() {
 					
 					//Toast.makeText(getApplicationContext(), "Result:" + result, Toast.LENGTH_LONG);
-					log.setText(log.getText() + "\nResult:" + result);
-									
+					log.setText(log.getText() + "\nResult:" + result);				
 				}
 			});
 			

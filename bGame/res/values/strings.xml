@@ -26,5 +26,8 @@
     <string name="hello_world">Hello world!</string>
     <string name="enter_number">Enter Number</string>
     <string name="guess">Guess</string>
+    <string name="title_activity_number_game">NumberGameActivity</string>
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
 
 </resources>

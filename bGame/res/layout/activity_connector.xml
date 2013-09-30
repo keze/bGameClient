@@ -41,7 +41,7 @@
             android:id="@+id/edit_server_port"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-            android:inputType="number"
+            android:inputType="text"
             android:singleLine="true" />
     </LinearLayout>
 

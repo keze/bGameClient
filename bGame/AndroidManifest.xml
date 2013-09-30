@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.sfs.connector"
+    package="com.dks.bgame.client.android"
     android:versionCode="1"
     android:versionName="1.0" >
 
@@ -27,6 +27,10 @@
         <activity
             android:name="com.dks.bgame.client.android.GameActivity"
             android:label="@string/title_activity_game" >
+        </activity>
+       <activity android:name=".NumberGameActivity"
+            android:label="@string/title_activity_number_game"
+            >
         </activity>
     </application>
 

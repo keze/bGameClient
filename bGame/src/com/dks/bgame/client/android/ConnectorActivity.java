@@ -1,8 +1,14 @@
 package com.dks.bgame.client.android;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
+
+import org.apache.commons.lang.StringUtils;
 
 import sfs2x.client.SmartFox;
 import sfs2x.client.core.BaseEvent;
@@ -26,35 +32,33 @@ import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.EditText;
 import android.widget.TextView;
 
-import com.sfs.connector.R;
+import com.smartfoxserver.v2.entities.data.ISFSObject;
 import com.smartfoxserver.v2.entities.data.SFSObject;
 import com.smartfoxserver.v2.exceptions.SFSException;
 
 public class ConnectorActivity extends Activity implements IEventListener {
 
 	private final String TAG = this.getClass().getSimpleName();
-	
+
 	private final static boolean VERBOSE_MODE = true;
 
 	private final static String DEFAULT_SERVER_ADDRESS = "10.0.2.2";
 	private final static String DEFAULT_SERVER_PORT = "9933";
-	private final static SimpleDateFormat logDateFormater = new SimpleDateFormat("h:mm:ss",
-			Locale.US);
+	private final static SimpleDateFormat logDateFormater = new SimpleDateFormat(
+			"h:mm:ss", Locale.US);
 	private final static int COLOR_GREEN = Color.parseColor("#99FF99");
 	private final static int COLOR_BLUE = Color.parseColor("#99CCFF");
 	private final static int COLOR_GRAY = Color.parseColor("#cccccc");
 	private final static int COLOR_RED = Color.parseColor("#FF0000");
 	private final static int COLOR_ORANGE = Color.parseColor("#f4aa0b");
 
-	
 	private final static String EXTENSION_ID = "MyGameExtension";
 	private final static String EXTENSIONS_CLASS = "com.dks.bgame.server.sfs2x.MyGameExt";
 	private final static String GAME_ROOMS_GROUP_NAME = "lvl1";
-	
-	
+
 	private final static String CMD_StartGame = "startgame";
-	
-	
+	private final static String RESPONSE_Ready = "ready";
+
 	private enum Status {
 		DISCONNECTED, CONNECTED, CONNECTING, CONNECTION_ERROR, CONNECTION_LOST, LOGGED, IN_A_ROOM, OTHER
 	}
@@ -91,9 +95,10 @@ public class ConnectorActivity extends Activity implements IEventListener {
 		sfsClient.addEventListener(SFSEvent.ROOM_JOIN, this);
 		sfsClient.addEventListener(SFSEvent.HANDSHAKE, this);
 		sfsClient.addEventListener(SFSEvent.SOCKET_ERROR, this);
+		sfsClient.addEventListener(SFSEvent.EXTENSION_RESPONSE, this);
 		if (VERBOSE_MODE)
-			Log.v(TAG, "SmartFox created:" + sfsClient.isConnected() + " BlueBox enabled="
-					+ sfsClient.useBlueBox());
+			Log.v(TAG, "SmartFox created:" + sfsClient.isConnected()
+					+ " BlueBox enabled=" + sfsClient.useBlueBox());
 	}
 
 	private void initUI() {
@@ -107,14 +112,18 @@ public class ConnectorActivity extends Activity implements IEventListener {
 		checkUseBlueBox = (CheckBox) findViewById(R.id.check_bluebox);
 
 		// Init the views & vyttibs
-		inputServerAddress.setText(DEFAULT_SERVER_ADDRESS);
-		inputServerPort.setText(DEFAULT_SERVER_PORT);
+		//inputServerAddress.setText(DEFAULT_SERVER_ADDRESS);
+		//inputServerPort.setText(DEFAULT_SERVER_PORT);
+		inputServerAddress.setText("johndoe@gmail.com");
+		inputServerPort.setText("john");
+		
 		buttonConnect.setOnClickListener(new View.OnClickListener() {
 
 			@Override
 			public void onClick(View v) {
-				connect(inputServerAddress.getText().toString(), inputServerPort.getText()
-						.toString());
+				//connect(inputServerAddress.getText().toString(),
+				//		inputServerPort.getText().toString());
+				connect(DEFAULT_SERVER_ADDRESS,DEFAULT_SERVER_PORT);
 				setStatus(Status.CONNECTING);
 			}
 		});
@@ -129,25 +138,31 @@ public class ConnectorActivity extends Activity implements IEventListener {
 			}
 		});
 		checkUseBlueBox.setChecked(sfsClient.useBlueBox());
-		checkUseBlueBox.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+		checkUseBlueBox
+				.setOnCheckedChangeListener(new OnCheckedChangeListener() {
 
-			@Override
-			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-				sfsClient.setUseBlueBox(isChecked);
-				if (VERBOSE_MODE) Log.v(TAG, "Use BlueBox=" + sfsClient.useBlueBox());
-			}
-		});
+					@Override
+					public void onCheckedChanged(CompoundButton buttonView,
+							boolean isChecked) {
+						sfsClient.setUseBlueBox(isChecked);
+						if (VERBOSE_MODE)
+							Log.v(TAG, "Use BlueBox=" + sfsClient.useBlueBox());
+					}
+				});
 	}
 
 	@Override
 	public void dispatch(final BaseEvent event) throws SFSException {
 		if (VERBOSE_MODE)
-			Log.v(TAG, "Dispatching " + event.getType() + " (arguments=" + event.getArguments()
-					+ ")");
+			Log.v(TAG, "Dispatching " + event.getType() + " (arguments="
+					+ event.getArguments() + ")");
 		if (event.getType().equalsIgnoreCase(SFSEvent.CONNECTION)) {
 			if (event.getArguments().get("success").equals(true)) {
 				// Login as guest in current zone
-				sfsClient.send(new LoginRequest("JohnDoe", "", "GuessGame"));
+				
+				String username = inputServerAddress.getText().toString();
+				String password = inputServerPort.getText().toString();
+				sfsClient.send(new LoginRequest(username, password,"GuessGame"));
 				setStatus(Status.CONNECTED, sfsClient.getConnectionMode());
 			} else {
 				setStatus(Status.CONNECTION_ERROR);
@@ -157,33 +172,75 @@ public class ConnectorActivity extends Activity implements IEventListener {
 			disconnect();
 		} else if (event.getType().equalsIgnoreCase(SFSEvent.LOGIN)) {
 			setStatus(Status.LOGGED, sfsClient.getCurrentZone());
+
+			// Start new game
+			sfsClient.send(new ExtensionRequest(CMD_StartGame, SFSObject.newInstance()));
 			
-			startGame();
-			//sfsClient.send(new JoinRoomRequest("The Lobby"));
-			//createGameRoom("");
-		} else if (event.getType().equalsIgnoreCase(SFSEvent.ROOM_JOIN)) {			
+		} else if (event.getType().equalsIgnoreCase(SFSEvent.ROOM_JOIN)) {
 			Room room = sfsClient.getLastJoinedRoom();
 			setStatus(Status.IN_A_ROOM, room.getName());
 
 			startActivity(new Intent(this, GameActivity.class));
+		} else if (event.getType().equalsIgnoreCase(SFSEvent.EXTENSION_RESPONSE)) {
+			
+			Log.v(TAG, "WATCH!!!!!!!!!!!!!");
+			
+			String cmd = event.getArguments().get("cmd").toString();
+			
+			ISFSObject resObj = (ISFSObject) event.getArguments().get("params");
+			
+			if (resObj != null) {
+				
+				int targetNumber = resObj.getInt("target");
+				int[] availableNumbers = new int[] { 
+						resObj.getInt("n0"), resObj.getInt("n1"),
+						resObj.getInt("n2"), resObj.getInt("n3"),
+						resObj.getInt("n4"), resObj.getInt("n5") };
+				
+				
+				//List<Integer> collection = new ArrayList<Integer>(resObj.getIntArray("numbers"));				
+				//int[] availableNumbers = new int[collection.size()];
+				//for (int i : collection) {
+				//	availableNumbers[i] = collection.get(i);
+				//}				
+				
+				//String s = "Target Number: " + targetNumber + ", Available numbers: " + StringUtils.join(collection, ',');
+				
+				//String s = "Target Number: " + targetNumber;
+				
+				//Log.v(TAG, s);
+			}
+			
+			
+			
+			if (cmd.equalsIgnoreCase(CMD_StartGame)) {
+				runOnUiThread(new Runnable() {
+					public void run() {
+						startGame();
+					}
+				});
+			}		
+		} else if (event.getType().equalsIgnoreCase(SFSEvent.ROOM_CREATION_ERROR)) {
+			setStatus(Status.OTHER,
+					"An error occurred while attempting to create the Room: ");// +
+																				// event.getArguments());
+
 		}
-	 else if (event.getType().equalsIgnoreCase(SFSEvent.ROOM_CREATION_ERROR)) {					 
-		setStatus(Status.OTHER, "An error occurred while attempting to create the Room: ");//+ event.getArguments());
-							
-	 }
-		
+
 	}
 
 	private void connect(String serverIP, String serverPort) {
 		// if the user have entered port number it uses it...
 		if (serverPort.length() > 0) {
 			int serverPortValue = Integer.parseInt(serverPort);
-			if (VERBOSE_MODE) Log.v(TAG, "Connecting to " + serverIP + ":" + serverPort);
+			if (VERBOSE_MODE)
+				Log.v(TAG, "Connecting to " + serverIP + ":" + serverPort);
 			sfsClient.connect(serverIP, serverPortValue);
 		}
 		// ...otherwise uses the default port number
 		else {
-			if (VERBOSE_MODE) Log.v(TAG, "Connecting to " + serverIP);
+			if (VERBOSE_MODE)
+				Log.v(TAG, "Connecting to " + serverIP);
 			sfsClient.connect(serverIP);
 		}
 	}
@@ -195,7 +252,8 @@ public class ConnectorActivity extends Activity implements IEventListener {
 	protected void onDestroy() {
 		super.onDestroy();
 		disconnect();
-		if (VERBOSE_MODE) Log.v(TAG, "Removing Listeners");
+		if (VERBOSE_MODE)
+			Log.v(TAG, "Removing Listeners");
 		sfsClient.removeAllEventListeners();
 	}
 
@@ -203,30 +261,23 @@ public class ConnectorActivity extends Activity implements IEventListener {
 	 * Disconnect the client from the server
 	 */
 	private void disconnect() {
-		if (VERBOSE_MODE) Log.v(TAG, "Disconnecting");
+		if (VERBOSE_MODE)
+			Log.v(TAG, "Disconnecting");
 
 		if (sfsClient.isConnected()) {
-			if (VERBOSE_MODE) Log.v(TAG, "Disconnect: Disconnecting client");
+			if (VERBOSE_MODE)
+				Log.v(TAG, "Disconnect: Disconnecting client");
 			sfsClient.disconnect();
-			if (VERBOSE_MODE) Log.v(TAG, "Disconnect: Disconnected ? " + !sfsClient.isConnected());
+			if (VERBOSE_MODE)
+				Log.v(TAG,
+						"Disconnect: Disconnected ? "
+								+ !sfsClient.isConnected());
 		}
 	}
-
 	
+
 	private void startGame() {
-		sfsClient.send(new ExtensionRequest(CMD_StartGame, SFSObject.newInstance()));
-	}
-	private void createGameRoom(String roomName){
-		if (roomName.length() > 0) {
-			RoomExtension extension = new RoomExtension(EXTENSION_ID, EXTENSIONS_CLASS);
-			RoomSettings settings = new RoomSettings(roomName);
-			//settings.setGroupId(GAME_ROOMS_GROUP_NAME);
-			settings.setGame(true);
-			settings.setMaxUsers(1);
-			settings.setMaxSpectators(0);
-			settings.setExtension(extension);
-			sfsClient.send(new CreateRoomRequest(settings, true, sfsClient.getLastJoinedRoom()));
-		}
+		startActivity(new Intent(this, GameActivity.class));
 	}
 	
 	/**
@@ -241,7 +292,8 @@ public class ConnectorActivity extends Activity implements IEventListener {
 			return;
 		}
 
-		if (VERBOSE_MODE) Log.v(TAG, "New status= " + status);
+		if (VERBOSE_MODE)
+			Log.v(TAG, "New status= " + status);
 		currentStatus = status;
 		final String message;
 		final int messageColor;
@@ -279,7 +331,8 @@ public class ConnectorActivity extends Activity implements IEventListener {
 			break;
 		case LOGGED:
 			message = getString(R.string.logged_into) + "'" + params[0] /*
-																		 * zone name
+																		 * zone
+																		 * name
 																		 */
 					+ "' zone";
 			messageColor = COLOR_GREEN;
@@ -332,7 +385,7 @@ public class ConnectorActivity extends Activity implements IEventListener {
 	 *            message to log
 	 */
 	private void log(final String message) {
-		labelLog.setText(logDateFormater.format(new Date()) + ": " + message + "\n"
-				+ labelLog.getText());
+		labelLog.setText(logDateFormater.format(new Date()) + ": " + message
+				+ "\n" + labelLog.getText());
 	}
 }
